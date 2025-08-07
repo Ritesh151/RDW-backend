@@ -15,10 +15,5 @@
       "src": "/uploads/(.*)",
       "dest": "app.js"
     }
-  ],
-  "env": {
-    "MONGODB_URI": "@furntech-mongodb-uri",
-    "SECRET_KEY": "@furntech-secret-key",
-    "FRONTEND_URL": "https://radhedispoworld.netlify.app/"
-  }
+  ]
 }
