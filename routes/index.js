@@ -1,20 +1,24 @@
 const express = require("express");
 const routes = express.Router();
 
+// Import routes
 const login = require("./login");
-routes.use("/admin", login.route);
-
 const products = require("./products");
-routes.use("/products", products.route);
-
 const user = require("./user");
-routes.use("/users", user.route);
-
 const order = require("./orders");
-routes.use("/orders", order.route);
-
 const customizationInquiry = require("./customizationInquiry");
+
+// Use routes
+routes.use("/admin", login.route);
+routes.use("/products", products.route);
+routes.use("/users", user.route);
+routes.use("/orders", order.route);
 routes.use("/customizationInquiry", customizationInquiry.route);
+
+// Health check endpoint
+routes.get("/health", (req, res) => {
+  res.status(200).json({ status: "OK" });
+});
 
 module.exports = {
   modules: {
@@ -24,6 +28,5 @@ module.exports = {
     order,
     customizationInquiry
   },
-  routes,
+  routes
 };
-

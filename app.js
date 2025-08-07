@@ -6,9 +6,6 @@ const createError = require("http-errors");
 const cookieParser = require("cookie-parser");
 const bodyParser = require("body-parser");
 const session = require("express-session");
-const dbConfig = require("./services/config").dbConfig;
-const seceretKey = require("./services/config").seceretKey;
-const indexRouter = require("./routes").routes;
 const path = require("path");
 const logger = require("morgan");
 const dotenv = require("dotenv");
@@ -18,76 +15,80 @@ dotenv.config();
 
 const app = express();
 
-//used for getting images for frontend
-app.use("/uploads", express.static(path.join(__dirname, "routes", "uploads")));
-
-//used to join frontend and backend
-app.use(cors());
+// Middleware setup
+app.use(logger("dev"));
+app.use(cors({
+  origin: process.env.FRONTEND_URL || "http://localhost:3000",
+  credentials: true
+}));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+app.use(bodyParser.json({ limit: "10mb" }));
+app.use(bodyParser.urlencoded({ limit: "10mb", extended: true }));
+app.use(
+  session({
+    secret: process.env.SECRET_KEY || "default-secret-key",
+    resave: false,
+    saveUninitialized: true,
+    cookie: { secure: process.env.NODE_ENV === "production" }
+  })
+);
 app.use(fileUpload({
   useTempFiles: true,
   tempFileDir: "/tmp/",
-  createParentPath:true
+  createParentPath: true,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 }));
-//logger in console of terminal
-app.use(logger("dev"));
 
-//server running port
-const PORT = process.env.PORT || 8001;
-app.listen(PORT, () => {
-  console.log(`Server Running On:${PORT}`);
-});
+// Static files
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// view engine setup
+// View engine setup
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
 
-//index router for whole routes of api
-app.use("/",indexRouter);
+// Database connection
+const mongoUri = process.env.MONGODB_URI || "mongodb://127.0.0.1/furntech";
 
-//session and seceret key added
-app.use(
-    session({
-        secret:seceretKey,
-        resave:false,
-        saveUninitialized:true
-    })
-)
+mongoose.connect(mongoUri, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  retryWrites: true,
+  w: "majority"
+})
+  .then(() => console.log("Database Connected Successfully"))
+  .catch(err => console.error("Database Connection Error:", err));
 
-//cookie parser
-app.use(cookieParser());
-app.use(bodyParser.json({ limit: "10mb" }))
-app.use(bodyParser.urlencoded({ limit: "10mb",extended: true }));
+// Routes
+const indexRouter = require("./routes").routes;
+app.use("/.netlify/functions/api", indexRouter);
+app.use("/api", indexRouter); // For local development
 
-const mongoUri = `${dbConfig.host}`;
-
-//connection to database
-mongoose.connect(mongoUri);
-
-mongoose.connection.once("open", () => {
-  console.log(`Database Connected Successfully: ${dbConfig.dbName}`);
-});
-
-mongoose.connection.on("error", () => {
-  throw new Error(`Error connecting to the database: ${err}`);
-});
-
-//catch 404 and forward to error handler
-app.use(function (req, res, next) {
+// Error handlers
+app.use((req, res, next) => {
   next(createError(404));
 });
 
-// error handler
-app.use(function (err, req, res, next) {
-  // set locals, only providing error in development
+app.use((err, req, res, next) => {
+  console.error(err.stack);
   res.locals.message = err.message;
   res.locals.error = req.app.get("env") === "development" ? err : {};
-
-  // render the error page
-  res.status(err.status || 500);
-  res.render("error");
+  res.status(err.status || 500).json({
+    error: {
+      message: err.message || "Internal Server Error",
+      status: err.status || 500
+    }
+  });
 });
 
+// For local development
+if (process.env.NODE_ENV !== "production") {
+  const PORT = process.env.PORT || 8001;
+  app.listen(PORT, () => {
+    console.log(`Server Running On: ${PORT}`);
+  });
+}
 
+module.exports = app;
 module.exports.handler = serverless(app);
-
