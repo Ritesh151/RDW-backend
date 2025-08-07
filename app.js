@@ -1,6 +1,7 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const serverless = require("serverless-http");
 const createError = require("http-errors");
 const cookieParser = require("cookie-parser");
 const bodyParser = require("body-parser");
@@ -86,3 +87,7 @@ app.use(function (err, req, res, next) {
   res.status(err.status || 500);
   res.render("error");
 });
+
+
+module.exports.handler = serverless(app);
+
